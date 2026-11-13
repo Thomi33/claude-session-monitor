@@ -1,0 +1,1 @@
+{ "name": "session-monitor", "version": "0.1.0", "description": "Panel lateral con cuota, modelo/esfuerzo, subagentes, contexto y botón de compactar", "types": "./types/index.d.ts" }
