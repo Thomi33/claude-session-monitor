@@ -12,6 +12,8 @@ declare module 'claude-code' {
       info: Shaped<Info>
       agents: Shaped<Agent[]>
       compacting: Shaped<boolean>
+      agentModel: Shaped<string>
+      switching: Shaped<boolean>
     }
   }
 }
