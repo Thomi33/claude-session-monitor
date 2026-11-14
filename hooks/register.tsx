@@ -34,6 +34,23 @@ function fmtReset(iso?: string): string {
   return h >= 24 ? `reinicia en ${Math.floor(h / 24)}d ${h % 24}h` : `reinicia en ${h}h ${m}m`
 }
 
+const BAR = 22
+const Bar = ({ Text, pct, tone }: { Text: any; pct: number; tone: string }) => {
+  const n = Math.max(0, Math.min(BAR, Math.round((Math.min(100, Math.max(0, pct)) / 100) * BAR)))
+  return (
+    <Text>
+      <Text color={tone}>{'█'.repeat(n)}</Text>
+      <Text dimColor>{'░'.repeat(BAR - n)}</Text>
+    </Text>
+  )
+}
+
+async function refreshModel($: EngineInterface) {
+  const model = await $.session.model()
+  const old = await read($, info)
+  if (model && old.model !== model) await update($, info, o => ({ ...o, model }))
+}
+
 const ACTIVE = new Set(['pending', 'running', 'waiting'])
 
 async function refreshUsage($: EngineInterface) {
@@ -62,6 +79,7 @@ export const register: Register = on => {
     await refreshAgents($).catch(() => {})
     $.clock.every(2000, () => {
       void refreshAgents($).catch(() => {})
+      void refreshModel($).catch(() => {})
     })
     void $.ui.open({ id: PANE, title: TITLE })
     return ran
@@ -76,6 +94,7 @@ export const register: Register = on => {
     await update($, limits, () => e.rateLimits.map(l => ({ ...l })))
     await update($, context, () => ({ tokens: e.context.tokens, window: e.context.window, percent: e.context.percent }))
     await update($, cost, () => e.cost?.usd ?? null)
+    void refreshModel($).catch(() => {})
     return next(e)
   })
 
@@ -104,7 +123,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Progress } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const ls = await read($, limits)
     const ctx = await read($, context)
     const usd = await read($, cost)
@@ -139,7 +158,7 @@ export const register: Register = on => {
               <Text>
                 {LIMIT_NAMES[l.kind] ?? l.kind}: <Text bold color={color(l.percentUsed)}>{l.percentUsed}%</Text>
               </Text>
-              <Progress label={LIMIT_NAMES[l.kind] ?? l.kind} value={l.percentUsed} max={100} color={color(l.percentUsed)} />
+              <Bar Text={Text} pct={l.percentUsed} tone={color(l.percentUsed)} />
               {fmtReset(l.resetsAt) !== '' && <Text dimColor>{fmtReset(l.resetsAt)}</Text>}
             </Box>
           ))}
@@ -177,13 +196,7 @@ export const register: Register = on => {
               <Text>
                 <Text bold color={color(ctxPct ?? 0)}>{ctxPct ?? 0}%</Text> · {fmtTokens(ctx.tokens)} / {fmtTokens(ctx.window)}
               </Text>
-              <Progress
-                label="Ventana de contexto"
-                value={ctx.tokens ?? 0}
-                max={ctx.window}
-                valueText={`${fmtTokens(ctx.tokens)} de ${fmtTokens(ctx.window)}`}
-                color={color(ctxPct ?? 0)}
-              />
+              <Bar Text={Text} pct={ctxPct ?? 0} tone={color(ctxPct ?? 0)} />
             </Box>
           )}
           <Button variant="primary" onPress={() => void doCompact()}>
